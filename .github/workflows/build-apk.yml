@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,9 +29,25 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: argon-launcher-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Workflow-artifact downloads redirect to blob storage that isn't reachable from where
+      # this gets fetched, so also publish the APK on a plain git branch - a normal git fetch
+      # of this branch is all that's needed to pick it up.
+      - name: Publish APK to apk-output branch
+        run: |
+          mkdir -p /tmp/apk-out
+          cp app/build/outputs/apk/debug/*.apk /tmp/apk-out/argon-launcher-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan apk-output
+          git rm -rf . > /dev/null
+          cp /tmp/apk-out/argon-launcher-debug.apk .
+          git add argon-launcher-debug.apk
+          git commit -m "Build from ${GITHUB_SHA} ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          git push origin HEAD:apk-output --force
