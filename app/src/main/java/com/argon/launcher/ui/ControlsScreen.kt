@@ -47,19 +47,19 @@ fun ControlsScreen(inputModeState: InputModeState, repository: ControlLayoutRepo
             modifier = Modifier.align(Alignment.TopCenter).padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = { editing = !editing }) { Text(if (editing) "Done" else "Customize") }
+            Button(onClick = { editing = !editing }) { Text(if (editing) "Bitti" else "Özelleştir") }
             if (editing) {
-                Button(onClick = { repository.save(config) }) { Text("Save") }
-                Button(onClick = { config = ControlLayoutConfig() }) { Text("Reset") }
+                Button(onClick = { repository.save(config) }) { Text("Kaydet") }
+                Button(onClick = { config = ControlLayoutConfig() }) { Text("Sıfırla") }
             }
         }
 
         if (!editing) {
             Text(
                 text = if (inputModeState.controlsVisible)
-                    "Touch controls visible - plug in a keyboard/mouse/controller to hide them"
+                    "Dokunmatik kontroller görünür - klavye/fare/kontrolcü bağlayınca gizlenirler"
                 else
-                    "Controls hidden (physical input detected) - tap the screen to bring them back",
+                    "Kontroller gizli (fiziksel giriş algılandı) - geri getirmek için ekrana dokun",
                 modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
                 color = Color.White
             )

@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
@@ -22,9 +25,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.argon.launcher.mods.CurseForgeClient
 import com.argon.launcher.mods.InstallEvent
 import com.argon.launcher.mods.ModClient
@@ -65,7 +72,7 @@ fun ModsScreen() {
             try {
                 results = client.search(query, isModpack, mcVersionFilter.ifBlank { null })
             } catch (e: Exception) {
-                searchError = "Search failed: ${e.message}"
+                searchError = "Arama başarısız: ${e.message}"
             } finally {
                 isSearching = false
             }
@@ -77,27 +84,27 @@ fun ModsScreen() {
             try {
                 val version = client.findBestVersion(mod.id, mcVersionFilter.ifBlank { null })
                 if (version == null) {
-                    installStatus.value = installStatus.value + (mod.id to "No compatible version found")
+                    installStatus.value = installStatus.value + (mod.id to "Uyumlu sürüm bulunamadı")
                     return@launch
                 }
                 val modsDir = File(context.filesDir, "mods")
                 installer.installModWithDependencies(client, mod.id, version, modsDir) { event ->
                     val line = when (event) {
-                        is InstallEvent.Downloading -> "Downloading ${event.fileName}"
-                        is InstallEvent.DependencyMissing -> "Dependency ${event.modId} not found, skipped"
-                        is InstallEvent.DependencyFailed -> "Dependency ${event.modId} failed: ${event.reason}"
-                        InstallEvent.Done -> "Installed"
+                        is InstallEvent.Downloading -> "İndiriliyor: ${event.fileName}"
+                        is InstallEvent.DependencyMissing -> "Bağımlılık ${event.modId} bulunamadı, atlandı"
+                        is InstallEvent.DependencyFailed -> "Bağımlılık ${event.modId} başarısız: ${event.reason}"
+                        InstallEvent.Done -> "Kuruldu"
                     }
                     installStatus.value = installStatus.value + (mod.id to line)
                 }
             } catch (e: Exception) {
-                installStatus.value = installStatus.value + (mod.id to "Install failed: ${e.message}")
+                installStatus.value = installStatus.value + (mod.id to "Kurulum başarısız: ${e.message}")
             }
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Mod Browser", style = MaterialTheme.typography.headlineSmall)
+        Text("Mod Tarayıcı", style = MaterialTheme.typography.headlineSmall)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = source == ModSource.MODRINTH, onClick = { source = ModSource.MODRINTH }, label = { Text("Modrinth") })
@@ -105,15 +112,15 @@ fun ModsScreen() {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = !isModpack, onClick = { isModpack = false }, label = { Text("Mods") })
-            FilterChip(selected = isModpack, onClick = { isModpack = true }, label = { Text("Modpacks") })
+            FilterChip(selected = !isModpack, onClick = { isModpack = false }, label = { Text("Modlar") })
+            FilterChip(selected = isModpack, onClick = { isModpack = true }, label = { Text("Modpaketleri") })
         }
 
         if (source == ModSource.CURSEFORGE) {
             OutlinedTextField(
                 value = curseForgeApiKey,
                 onValueChange = { curseForgeApiKey = it },
-                label = { Text("CurseForge API key (console.curseforge.com)") },
+                label = { Text("CurseForge API anahtarı (console.curseforge.com)") },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -122,16 +129,16 @@ fun ModsScreen() {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Search") },
+                label = { Text("Mod ara") },
                 modifier = Modifier.weight(1f)
             )
-            Button(onClick = { runSearch() }, modifier = Modifier.padding(start = 8.dp)) { Text("Go") }
+            Button(onClick = { runSearch() }, modifier = Modifier.padding(start = 8.dp)) { Text("Ara") }
         }
 
         OutlinedTextField(
             value = mcVersionFilter,
             onValueChange = { mcVersionFilter = it },
-            label = { Text("Minecraft version (optional, e.g. 1.21)") },
+            label = { Text("Minecraft sürümü (isteğe bağlı, örn. 1.21)") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -140,23 +147,57 @@ fun ModsScreen() {
 
         Divider()
 
-        LazyColumn {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(results, key = { it.id }) { mod ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(mod.title, style = MaterialTheme.typography.titleMedium)
-                        if (mod.description.isNotBlank()) Text(mod.description, style = MaterialTheme.typography.bodySmall)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            val status = installStatus.value[mod.id]
-                            Text(status ?: "", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                            Button(onClick = { install(mod) }) { Text("Install") }
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp)) {
+                        ModIcon(mod)
+                        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+                            Text(mod.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            if (mod.description.isNotBlank()) {
+                                Text(
+                                    mod.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val status = installStatus.value[mod.id]
+                                Text(
+                                    status ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Button(onClick = { install(mod) }) { Text("Kur") }
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** The mod's real icon when it loads; a colored initial-letter tile underneath it the rest of the time. */
+@Composable
+private fun ModIcon(mod: ModSummary) {
+    InitialAvatar(seed = mod.title, size = 48.dp, shape = RoundedCornerShape(10.dp)) {
+        if (mod.iconUrl != null) {
+            AsyncImage(
+                model = mod.iconUrl,
+                contentDescription = mod.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(48.dp)
+            )
         }
     }
 }

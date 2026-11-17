@@ -74,27 +74,46 @@ fun AccountsScreen(
             repository.addOrUpdate(account)
             refresh()
         } catch (e: Exception) {
-            statusMessage = "Ely.by sign-in failed: ${e.message}"
+            statusMessage = "Ely.by girişi başarısız: ${e.message}"
         } finally {
             onElyByCodeConsumed()
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Accounts", style = MaterialTheme.typography.headlineSmall)
+        Text("Hesaplar", style = MaterialTheme.typography.headlineSmall)
 
         if (statusMessage != null) {
             Text(statusMessage!!, color = MaterialTheme.colorScheme.error)
         }
 
-        LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+        if (accounts.isEmpty()) {
+            Text(
+                "Henüz hesap yok - aşağıdan bir tane ekle.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.weight(1f, fill = false),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             items(accounts, key = { it.id }) { account ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row {
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            InitialAvatar(seed = account.username, size = 40.dp)
+                            Column(modifier = Modifier.padding(start = 12.dp)) {
+                                Text(account.username, style = MaterialTheme.typography.titleMedium)
+                                Text(account.type.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                             RadioButton(
                                 selected = account.id == selectedId,
                                 onClick = {
@@ -102,15 +121,11 @@ fun AccountsScreen(
                                     refresh()
                                 }
                             )
-                            Column {
-                                Text(account.username)
-                                Text(account.type.name, style = MaterialTheme.typography.bodySmall)
-                            }
+                            TextButton(onClick = {
+                                repository.remove(account.id)
+                                refresh()
+                            }) { Text("Sil") }
                         }
-                        TextButton(onClick = {
-                            repository.remove(account.id)
-                            refresh()
-                        }) { Text("Remove") }
                     }
                 }
             }
@@ -118,12 +133,12 @@ fun AccountsScreen(
 
         Divider()
 
-        Text("Add offline account", style = MaterialTheme.typography.titleMedium)
+        Text("Offline hesap ekle", style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             OutlinedTextField(
                 value = offlineUsername,
                 onValueChange = { offlineUsername = it },
-                label = { Text("Username") },
+                label = { Text("Kullanıcı adı") },
                 modifier = Modifier.weight(1f)
             )
             Button(onClick = {
@@ -132,7 +147,7 @@ fun AccountsScreen(
                     offlineUsername = ""
                     refresh()
                 }
-            }, modifier = Modifier.padding(start = 8.dp)) { Text("Add") }
+            }, modifier = Modifier.padding(start = 8.dp)) { Text("Ekle") }
         }
 
         Divider()
@@ -149,13 +164,13 @@ fun AccountsScreen(
                         repository.addOrUpdate(account)
                         refresh()
                     } catch (e: Exception) {
-                        statusMessage = "Microsoft sign-in failed: ${e.message}"
+                        statusMessage = "Microsoft girişi başarısız: ${e.message}"
                     } finally {
                         deviceCodePrompt = null
                     }
                 }
             }
-        ) { Text("Sign in with Microsoft") }
+        ) { Text("Microsoft ile giriş yap") }
 
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
@@ -163,17 +178,17 @@ fun AccountsScreen(
                 statusMessage = null
                 onOpenElyByLogin(elyByAuth.buildAuthorizationUrl())
             }
-        ) { Text("Sign in with Ely.by") }
+        ) { Text("Ely.by ile giriş yap") }
     }
 
     val prompt = deviceCodePrompt
     if (prompt != null) {
         AlertDialog(
             onDismissRequest = { /* Must finish or be cancelled explicitly - this is a device code flow */ },
-            title = { Text("Sign in with Microsoft") },
+            title = { Text("Microsoft ile giriş yap") },
             text = {
                 Column {
-                    Text("Open the page below and enter this code:")
+                    Text("Aşağıdaki sayfayı aç ve bu kodu gir:")
                     Text(prompt.userCode, style = MaterialTheme.typography.headlineSmall)
                     Text(prompt.verificationUri, style = MaterialTheme.typography.bodySmall)
                     androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(4.dp))
@@ -183,13 +198,13 @@ fun AccountsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(prompt.verificationUri)))
-                }) { Text("Open browser") }
+                }) { Text("Tarayıcıda aç") }
             },
             dismissButton = {
                 TextButton(onClick = {
                     microsoftSignInJob?.cancel()
                     deviceCodePrompt = null
-                }) { Text("Cancel") }
+                }) { Text("İptal") }
             }
         )
     }
